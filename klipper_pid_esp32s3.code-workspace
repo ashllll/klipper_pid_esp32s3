@@ -1,0 +1,9 @@
+{
+	"folders": [
+		{
+			"name": "klipper_pid_esp32s3",
+			"path": "."
+		}
+	],
+	"settings": {}
+}

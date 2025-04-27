@@ -18,18 +18,18 @@ const char* nvs_key_kp = "pid_kp";
 const char* nvs_key_ki = "pid_ki";
 const char* nvs_key_kd = "pid_kd";
 
-// --- Pin Definitions (Corrected based on xiao esp32s3 pin.md) ---
+// --- Pin Definitions (Based on ESP32-S3 DevKitC-1 Standard) ---
 // I2C Pins (for SSD1306 & ADS1115)
-#define I2C_SDA_PIN  5  // XIAO D4/A4/TOUCH5 (GPIO5)
-#define I2C_SCL_PIN  6  // XIAO D5/A5/TOUCH6 (GPIO6)
+#define I2C_SDA_PIN  8  // DevKitC-1 Default SDA (GPIO8)
+#define I2C_SCL_PIN  9  // DevKitC-1 Default SCL (GPIO9)
 
 // PWM Output Pin (for Heater MOSFET)
-#define PWM_HEATER_PIN 10 // XIAO D10/A10 (GPIO10) - !!! 请根据实际接线确认 !!! (原为 GPIO1, 与 ENC_A 冲突)
+#define PWM_HEATER_PIN 10 // DevKitC-1 GPIO10 (Any GPIO can be PWM) - !!! 请根据实际接线确认 !!!
 
 // Rotary Encoder Pins (EC11)
-#define ENC_A_PIN    1  // XIAO D0/A0/TOUCH1 (GPIO1)
-#define ENC_B_PIN    2  // XIAO D1/A1/TOUCH2 (GPIO2)
-#define ENC_SW_PIN   3  // XIAO D2/A2/TOUCH3 (GPIO3) - 假设按钮下拉低电平有效 (需外部上拉? GyverEncoder TYPE1 默认处理)
+#define ENC_A_PIN    1  // DevKitC-1 GPIO1
+#define ENC_B_PIN    2  // DevKitC-1 GPIO2
+#define ENC_SW_PIN   42  // DevKitC-1 GPIO3 (Strapping Pin - Use with caution) - 假设按钮下拉低电平有效
 
 // --- Constants ---
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -708,6 +708,8 @@ void uiTask(void *pvParameters) {
     unsigned long blinkStartTime = 0;
     bool blinkState = false;
     const unsigned long blinkInterval = 300; // Blinking speed for menu cursor
+    unsigned long lastNavEventTime = 0; // Timestamp for home screen navigation debounce
+    const unsigned long navDebounceInterval = 100; // Debounce time in ms
 
 
     Serial.println("UITask started.");
@@ -723,10 +725,18 @@ void uiTask(void *pvParameters) {
 
             switch (currentState) {
                 case STATE_HOME:
-                    if (receivedEvent == NAV_UP) {
-                        homePageIndex = (homePageIndex - 1 + numHomePageIndexes) % numHomePageIndexes;
-                    } else if (receivedEvent == NAV_DOWN) {
-                        homePageIndex = (homePageIndex + 1) % numHomePageIndexes;
+                    if (receivedEvent == NAV_UP || receivedEvent == NAV_DOWN) {
+                        unsigned long currentMillis = millis();
+                        if (currentMillis - lastNavEventTime > navDebounceInterval) {
+                            if (receivedEvent == NAV_UP) {
+                                homePageIndex = (homePageIndex - 1 + numHomePageIndexes) % numHomePageIndexes;
+                            } else { // NAV_DOWN
+                                homePageIndex = (homePageIndex + 1) % numHomePageIndexes;
+                            }
+                            lastNavEventTime = currentMillis; // Update timestamp only when event is processed
+                        } else {
+                            redrawRequired = false; // Ignore event, don't redraw
+                        }
                     } else if (receivedEvent == CONFIRM) {
                         currentState = STATE_SETTINGS_MENU;
                         selectedMenuItem = 0;
